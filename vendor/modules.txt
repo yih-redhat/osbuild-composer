@@ -799,7 +799,7 @@ github.com/vbauerster/mpb/v8
 github.com/vbauerster/mpb/v8/cwriter
 github.com/vbauerster/mpb/v8/decor
 github.com/vbauerster/mpb/v8/internal
-# github.com/vmware/govmomi v0.32.0
+# github.com/vmware/govmomi v0.33.0
 ## explicit; go 1.19
 github.com/vmware/govmomi/cns
 github.com/vmware/govmomi/cns/methods
