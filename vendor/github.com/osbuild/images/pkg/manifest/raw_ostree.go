@@ -76,17 +76,31 @@ func (p *RawOSTreeImage) serialize() osbuild.Pipeline {
 		_, bootCopyDevices, bootCopyMounts := osbuild.GenCopyFSTreeOptions(inputName, p.treePipeline.Name(), p.Filename(), pt)
 		bootCopyOptions := &osbuild.CopyStageOptions{}
 
-		commit := p.treePipeline.ostreeSpecs[0]
+		commit := p.treePipeline.ostreeSpec
 		commitChecksum := commit.Checksum
 
 		bootCopyInputs := osbuild.OSTreeCheckoutInputs{
 			"ostree-tree": *osbuild.NewOSTreeCheckoutInput("org.osbuild.source", commitChecksum),
 		}
 
+		// Find the FS root mount name to use as the destination root
+		// for the target when copying the boot files.
+		var fsRootMntName string
+		for _, mnt := range *bootCopyMounts {
+			if mnt.Target == "/" {
+				fsRootMntName = mnt.Name
+				break
+			}
+		}
+
+		if fsRootMntName == "" {
+			panic("no mount found for the filesystem root")
+		}
+
 		for _, paths := range bootFiles {
 			bootCopyOptions.Paths = append(bootCopyOptions.Paths, osbuild.CopyStagePath{
 				From: fmt.Sprintf("input://ostree-tree/%s%s", commitChecksum, paths[0]),
-				To:   fmt.Sprintf("mount://root%s", paths[1]),
+				To:   fmt.Sprintf("mount://%s%s", fsRootMntName, paths[1]),
 			})
 		}
 
