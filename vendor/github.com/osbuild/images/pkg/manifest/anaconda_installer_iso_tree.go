@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/osbuild/images/internal/users"
 	"github.com/osbuild/images/pkg/container"
+	"github.com/osbuild/images/pkg/customizations/users"
 	"github.com/osbuild/images/pkg/disk"
 	"github.com/osbuild/images/pkg/osbuild"
 	"github.com/osbuild/images/pkg/ostree"
@@ -155,10 +155,10 @@ func (p *AnacondaInstallerISOTree) serialize() osbuild.Pipeline {
 	pipeline.AddStage(osbuild.NewMkdirStage(&osbuild.MkdirStageOptions{
 		Paths: []osbuild.MkdirStagePath{
 			{
-				Path: "images",
+				Path: "/images",
 			},
 			{
-				Path: "images/pxeboot",
+				Path: "/images/pxeboot",
 			},
 		},
 	}))
@@ -167,7 +167,7 @@ func (p *AnacondaInstallerISOTree) serialize() osbuild.Pipeline {
 		pipeline.AddStage(osbuild.NewMkdirStage(&osbuild.MkdirStageOptions{
 			Paths: []osbuild.MkdirStagePath{
 				{
-					Path: "LiveOS",
+					Path: "/LiveOS",
 				},
 			},
 		}))

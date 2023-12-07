@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	"github.com/osbuild/images/internal/users"
+	"github.com/osbuild/images/pkg/customizations/users"
 	"github.com/osbuild/images/pkg/disk"
 	"github.com/osbuild/images/pkg/osbuild"
 )
@@ -98,10 +98,10 @@ func (p *CoreOSISOTree) serialize() osbuild.Pipeline {
 	pipeline.AddStage(osbuild.NewMkdirStage(&osbuild.MkdirStageOptions{
 		Paths: []osbuild.MkdirStagePath{
 			{
-				Path: "images",
+				Path: "/images",
 			},
 			{
-				Path: "images/pxeboot",
+				Path: "/images/pxeboot",
 			},
 		},
 	}))
