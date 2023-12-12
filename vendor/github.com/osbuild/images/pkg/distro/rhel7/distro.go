@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/osbuild/images/internal/common"
+	"github.com/osbuild/images/pkg/arch"
 	"github.com/osbuild/images/pkg/distro"
 	"github.com/osbuild/images/pkg/osbuild"
 	"github.com/osbuild/images/pkg/platform"
@@ -21,6 +22,9 @@ const (
 
 	// blueprint package set name
 	blueprintPkgsKey = "blueprint"
+
+	// location for saving openscap remediation data
+	oscapDataDir = "/oscap_data"
 )
 
 // RHEL-based OS image configuration defaults
@@ -200,7 +204,7 @@ func newDistro(distroName string) distro.Distro {
 
 	// Architecture definitions
 	x86_64 := architecture{
-		name:   platform.ARCH_X86_64.String(),
+		name:   arch.ARCH_X86_64.String(),
 		distro: &rd,
 	}
 
