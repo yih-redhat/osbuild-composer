@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/osbuild/images/internal/users"
 	"github.com/osbuild/images/pkg/container"
+	"github.com/osbuild/images/pkg/customizations/users"
 	"github.com/osbuild/images/pkg/disk"
 	"github.com/osbuild/images/pkg/osbuild"
 	"github.com/osbuild/images/pkg/ostree"
@@ -155,10 +155,10 @@ func (p *AnacondaInstallerISOTree) serialize() osbuild.Pipeline {
 	pipeline.AddStage(osbuild.NewMkdirStage(&osbuild.MkdirStageOptions{
 		Paths: []osbuild.MkdirStagePath{
 			{
-				Path: "images",
+				Path: "/images",
 			},
 			{
-				Path: "images/pxeboot",
+				Path: "/images/pxeboot",
 			},
 		},
 	}))
@@ -167,7 +167,7 @@ func (p *AnacondaInstallerISOTree) serialize() osbuild.Pipeline {
 		pipeline.AddStage(osbuild.NewMkdirStage(&osbuild.MkdirStageOptions{
 			Paths: []osbuild.MkdirStagePath{
 				{
-					Path: "LiveOS",
+					Path: "/LiveOS",
 				},
 			},
 		}))
@@ -272,7 +272,13 @@ func (p *AnacondaInstallerISOTree) serialize() osbuild.Pipeline {
 		))
 
 		// Configure the kickstart file with the payload and any user options
-		kickstartOptions, err := osbuild.NewKickstartStageOptions(p.KSPath, "", p.Users, p.Groups, makeISORootPath(p.PayloadPath), p.ostreeCommitSpec.Ref, p.OSName)
+		kickstartOptions, err := osbuild.NewKickstartStageOptionsWithOSTreeCommit(
+			p.KSPath,
+			p.Users,
+			p.Groups,
+			makeISORootPath(p.PayloadPath),
+			p.ostreeCommitSpec.Ref,
+			p.OSName)
 
 		if err != nil {
 			panic("failed to create kickstartstage options")
@@ -288,7 +294,12 @@ func (p *AnacondaInstallerISOTree) serialize() osbuild.Pipeline {
 		// If the KSPath is set, we need to add the kickstart stage to this (bootiso-tree) pipeline.
 		// If it's not specified here, it should have been added to the InteractiveDefaults in the anaconda-tree.
 		if p.KSPath != "" {
-			kickstartOptions, err := osbuild.NewKickstartStageOptions(p.KSPath, makeISORootPath(p.PayloadPath), p.Users, p.Groups, "", "", p.OSName)
+			kickstartOptions, err := osbuild.NewKickstartStageOptionsWithLiveIMG(
+				p.KSPath,
+				p.Users,
+				p.Groups,
+				makeISORootPath(p.PayloadPath))
+
 			if err != nil {
 				panic("failed to create kickstartstage options")
 			}

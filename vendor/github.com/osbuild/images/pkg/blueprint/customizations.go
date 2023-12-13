@@ -24,6 +24,7 @@ type Customizations struct {
 	Directories        []DirectoryCustomization  `json:"directories,omitempty" toml:"directories,omitempty"`
 	Files              []FileCustomization       `json:"files,omitempty" toml:"files,omitempty"`
 	Repositories       []RepositoryCustomization `json:"repositories,omitempty" toml:"repositories,omitempty"`
+	FIPS               *bool                     `json:"fips,omitempty" toml:"fips,omitempty"`
 }
 
 type IgnitionCustomization struct {
@@ -44,8 +45,9 @@ type FDOCustomization struct {
 	DiunPubKeyInsecure     string `json:"diun_pub_key_insecure,omitempty" toml:"diun_pub_key_insecure,omitempty"`
 	// This is the output of:
 	// echo "sha256:$(openssl x509 -fingerprint -sha256 -noout -in diun_cert.pem | cut -d"=" -f2 | sed 's/://g')"
-	DiunPubKeyHash      string `json:"diun_pub_key_hash,omitempty" toml:"diun_pub_key_hash,omitempty"`
-	DiunPubKeyRootCerts string `json:"diun_pub_key_root_certs,omitempty" toml:"diun_pub_key_root_certs,omitempty"`
+	DiunPubKeyHash          string `json:"diun_pub_key_hash,omitempty" toml:"diun_pub_key_hash,omitempty"`
+	DiunPubKeyRootCerts     string `json:"diun_pub_key_root_certs,omitempty" toml:"diun_pub_key_root_certs,omitempty"`
+	DiMfgStringTypeMacIface string `json:"di_mfg_string_type_mac_iface,omitempty" toml:"di_mfg_string_type_mac_iface,omitempty"`
 }
 
 type KernelCustomization struct {
@@ -355,4 +357,11 @@ func (c *Customizations) GetRepositories() ([]RepositoryCustomization, error) {
 	}
 
 	return c.Repositories, nil
+}
+
+func (c *Customizations) GetFIPS() bool {
+	if c == nil || c.FIPS == nil {
+		return false
+	}
+	return *c.FIPS
 }

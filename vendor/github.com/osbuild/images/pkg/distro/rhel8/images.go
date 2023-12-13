@@ -4,20 +4,20 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/osbuild/images/internal/fdo"
-	"github.com/osbuild/images/internal/fsnode"
-	"github.com/osbuild/images/internal/ignition"
-	"github.com/osbuild/images/internal/oscap"
-	"github.com/osbuild/images/internal/users"
 	"github.com/osbuild/images/internal/workload"
+	"github.com/osbuild/images/pkg/arch"
 	"github.com/osbuild/images/pkg/blueprint"
 	"github.com/osbuild/images/pkg/container"
+	"github.com/osbuild/images/pkg/customizations/fdo"
+	"github.com/osbuild/images/pkg/customizations/fsnode"
+	"github.com/osbuild/images/pkg/customizations/ignition"
+	"github.com/osbuild/images/pkg/customizations/oscap"
+	"github.com/osbuild/images/pkg/customizations/users"
 	"github.com/osbuild/images/pkg/distro"
 	"github.com/osbuild/images/pkg/image"
 	"github.com/osbuild/images/pkg/manifest"
 	"github.com/osbuild/images/pkg/osbuild"
 	"github.com/osbuild/images/pkg/ostree"
-	"github.com/osbuild/images/pkg/platform"
 	"github.com/osbuild/images/pkg/rpmmd"
 )
 
@@ -44,7 +44,7 @@ func osCustomizations(
 			kernelOptions = append(kernelOptions, bpKernel.Append)
 		}
 		osc.KernelOptionsAppend = kernelOptions
-		if t.platform.GetArch() != platform.ARCH_S390X {
+		if t.platform.GetArch() != arch.ARCH_S390X {
 			osc.KernelOptionsBootloader = true
 		}
 	}
@@ -186,14 +186,25 @@ func osCustomizations(
 		if t.rpmOstree {
 			panic("unexpected oscap options for ostree image type")
 		}
+
+		// although the osbuild stage will create this directory,
+		// it's probably better to ensure that it is created here
+		dataDirNode, err := fsnode.NewDirectory(oscapDataDir, nil, nil, nil, true)
+		if err != nil {
+			panic("unexpected error creating OpenSCAP data directory")
+		}
+
+		osc.Directories = append(osc.Directories, dataDirNode)
+
 		var datastream = oscapConfig.DataStream
 		if datastream == "" {
 			datastream = oscap.DefaultRHEL8Datastream(t.arch.distro.isRHEL())
 		}
 
 		oscapStageOptions := osbuild.OscapConfig{
-			Datastream: datastream,
-			ProfileID:  oscapConfig.ProfileID,
+			Datastream:  datastream,
+			ProfileID:   oscapConfig.ProfileID,
+			Compression: true,
 		}
 
 		if oscapConfig.Tailoring != nil {
@@ -203,14 +214,15 @@ func osCustomizations(
 			}
 
 			tailoringOptions := osbuild.OscapAutotailorConfig{
+				NewProfile: newProfile,
+				Datastream: datastream,
+				ProfileID:  oscapConfig.ProfileID,
 				Selected:   oscapConfig.Tailoring.Selected,
 				Unselected: oscapConfig.Tailoring.Unselected,
-				NewProfile: newProfile,
 			}
 
 			osc.OpenSCAPTailorConfig = osbuild.NewOscapAutotailorStageOptions(
 				tailoringFilepath,
-				oscapStageOptions,
 				tailoringOptions,
 			)
 
@@ -222,7 +234,7 @@ func osCustomizations(
 			osc.Directories = append(osc.Directories, tailoringDir)
 		}
 
-		osc.OpenSCAPConfig = osbuild.NewOscapRemediationStageOptions(oscapStageOptions)
+		osc.OpenSCAPConfig = osbuild.NewOscapRemediationStageOptions(oscapDataDir, oscapStageOptions)
 	}
 
 	osc.ShellInit = imageConfig.ShellInit
@@ -443,7 +455,7 @@ func edgeRawImage(workload workload.Workload,
 		return nil, fmt.Errorf("%s: %s", t.Name(), err.Error())
 	}
 
-	img := image.NewOSTreeDiskImage(commit)
+	img := image.NewOSTreeDiskImageFromCommit(commit)
 
 	img.Users = users.UsersFromBP(customizations.GetUsers())
 	img.Groups = users.GroupsFromBP(customizations.GetGroups())
@@ -461,6 +473,7 @@ func edgeRawImage(workload workload.Workload,
 		ContentURL: options.OSTree.ContentURL,
 	}
 	img.OSName = "redhat"
+	img.LockRoot = true
 
 	// TODO: move generation into LiveImage
 	pt, err := t.getPartitionTable(customizations.GetFilesystems(), options, rng)
@@ -488,7 +501,7 @@ func edgeSimplifiedInstallerImage(workload workload.Workload,
 		return nil, fmt.Errorf("%s: %s", t.Name(), err.Error())
 	}
 
-	rawImg := image.NewOSTreeDiskImage(commit)
+	rawImg := image.NewOSTreeDiskImageFromCommit(commit)
 
 	rawImg.Users = users.UsersFromBP(customizations.GetUsers())
 	rawImg.Groups = users.GroupsFromBP(customizations.GetGroups())
@@ -505,6 +518,7 @@ func edgeSimplifiedInstallerImage(workload workload.Workload,
 		ContentURL: options.OSTree.ContentURL,
 	}
 	rawImg.OSName = "redhat"
+	rawImg.LockRoot = true
 
 	// TODO: move generation into LiveImage
 	pt, err := t.getPartitionTable(customizations.GetFilesystems(), options, rng)

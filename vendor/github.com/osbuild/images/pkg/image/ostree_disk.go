@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/osbuild/images/internal/fsnode"
-	"github.com/osbuild/images/internal/users"
 	"github.com/osbuild/images/internal/workload"
 	"github.com/osbuild/images/pkg/artifact"
+	"github.com/osbuild/images/pkg/container"
+	"github.com/osbuild/images/pkg/customizations/fsnode"
+	"github.com/osbuild/images/pkg/customizations/users"
 	"github.com/osbuild/images/pkg/disk"
 	"github.com/osbuild/images/pkg/manifest"
 	"github.com/osbuild/images/pkg/ostree"
@@ -26,12 +27,14 @@ type OSTreeDiskImage struct {
 	Users  []users.User
 	Groups []users.Group
 
-	CommitSource ostree.SourceSpec
+	CommitSource    *ostree.SourceSpec
+	ContainerSource *container.SourceSpec
 
 	SysrootReadOnly bool
 
 	Remote ostree.Remote
 	OSName string
+	Ref    string
 
 	KernelOptionsAppend []string
 	Keyboard            string
@@ -39,23 +42,49 @@ type OSTreeDiskImage struct {
 
 	Filename string
 
-	Ignition         bool
 	IgnitionPlatform string
 	Compression      string
 
 	Directories []*fsnode.Directory
 	Files       []*fsnode.File
+
+	FIPS bool
+
+	// Lock the root account in the deployment unless the user defined root
+	// user options in the build configuration.
+	LockRoot bool
+
+	// Container buildable tweaks the buildroot to be container friendly,
+	// i.e. to not rely on an installed osbuild-selinux
+	ContainerBuildable bool
 }
 
-func NewOSTreeDiskImage(commit ostree.SourceSpec) *OSTreeDiskImage {
+func NewOSTreeDiskImageFromCommit(commit ostree.SourceSpec) *OSTreeDiskImage {
 	return &OSTreeDiskImage{
 		Base:         NewBase("ostree-raw-image"),
-		CommitSource: commit,
+		CommitSource: &commit,
+	}
+}
+
+func NewOSTreeDiskImageFromContainer(container container.SourceSpec, ref string) *OSTreeDiskImage {
+	return &OSTreeDiskImage{
+		Base:            NewBase("ostree-raw-image"),
+		ContainerSource: &container,
+		Ref:             ref,
 	}
 }
 
 func baseRawOstreeImage(img *OSTreeDiskImage, m *manifest.Manifest, buildPipeline *manifest.Build) *manifest.RawOSTreeImage {
-	osPipeline := manifest.NewOSTreeDeployment(buildPipeline, m, img.CommitSource, img.OSName, img.Ignition, img.IgnitionPlatform, img.Platform)
+	var osPipeline *manifest.OSTreeDeployment
+	switch {
+	case img.CommitSource != nil:
+		osPipeline = manifest.NewOSTreeCommitDeployment(buildPipeline, m, img.CommitSource, img.OSName, img.Platform)
+	case img.ContainerSource != nil:
+		osPipeline = manifest.NewOSTreeContainerDeployment(buildPipeline, m, img.ContainerSource, img.Ref, img.OSName, img.Platform)
+	default:
+		panic("no content source defined for ostree image")
+	}
+
 	osPipeline.PartitionTable = img.PartitionTable
 	osPipeline.Remote = img.Remote
 	osPipeline.KernelOptionsAppend = img.KernelOptionsAppend
@@ -66,6 +95,9 @@ func baseRawOstreeImage(img *OSTreeDiskImage, m *manifest.Manifest, buildPipelin
 	osPipeline.SysrootReadOnly = img.SysrootReadOnly
 	osPipeline.Directories = img.Directories
 	osPipeline.Files = img.Files
+	osPipeline.FIPS = img.FIPS
+	osPipeline.IgnitionPlatform = img.IgnitionPlatform
+	osPipeline.LockRoot = img.LockRoot
 
 	// other image types (e.g. live) pass the workload to the pipeline.
 	osPipeline.EnabledServices = img.Workload.GetServices()
@@ -74,11 +106,14 @@ func baseRawOstreeImage(img *OSTreeDiskImage, m *manifest.Manifest, buildPipelin
 	return manifest.NewRawOStreeImage(buildPipeline, osPipeline, img.Platform)
 }
 
+// replaced in testing
+var manifestNewBuild = manifest.NewBuild
+
 func (img *OSTreeDiskImage) InstantiateManifest(m *manifest.Manifest,
 	repos []rpmmd.RepoConfig,
 	runner runner.Runner,
 	rng *rand.Rand) (*artifact.Artifact, error) {
-	buildPipeline := manifest.NewBuild(m, runner, repos)
+	buildPipeline := manifestNewBuild(m, runner, repos, &manifest.BuildOptions{ContainerBuildable: img.ContainerBuildable})
 	buildPipeline.Checkpoint()
 
 	// don't support compressing non-raw images
