@@ -253,7 +253,7 @@ func newDistro(name string, minor int) *distribution {
 	}
 	x86_64.addImageTypes(
 		ec2X86Platform,
-		mkAMIImgTypeX86_64(rd.osVersion, rd.isRHEL()),
+		mkAMIImgTypeX86_64(),
 	)
 
 	gceX86Platform := &platform.X86{
@@ -264,7 +264,7 @@ func newDistro(name string, minor int) *distribution {
 	}
 	x86_64.addImageTypes(
 		gceX86Platform,
-		mkGCEImageType(rd.isRHEL()),
+		mkGCEImageType(),
 	)
 
 	x86_64.addImageTypes(
@@ -391,7 +391,7 @@ func newDistro(name string, minor int) *distribution {
 				ImageFormat: platform.FORMAT_RAW,
 			},
 		},
-		mkAMIImgTypeAarch64(rd.osVersion, rd.isRHEL()),
+		mkAMIImgTypeAarch64(),
 	)
 
 	ppc64le.addImageTypes(
@@ -455,7 +455,7 @@ func newDistro(name string, minor int) *distribution {
 		)
 
 		// add GCE RHUI image to RHEL only
-		x86_64.addImageTypes(gceX86Platform, mkGCERHUIImageType(rd.isRHEL()))
+		x86_64.addImageTypes(gceX86Platform, mkGCERHUIImageType())
 	} else {
 		x86_64.addImageTypes(azureX64Platform, azureImgType)
 		aarch64.addImageTypes(azureAarch64Platform, azureImgType)
@@ -474,14 +474,17 @@ func ParseID(idStr string) (*distro.ID, error) {
 		return nil, fmt.Errorf("invalid distro name: %s", id.Name)
 	}
 
-	// Backward compatibility layer for "rhel-93" and friends
+	// Backward compatibility layer for "rhel-93" or "rhel-910"
 	if id.Name == "rhel" && id.MinorVersion == -1 {
 		if id.MajorVersion/10 == 9 {
 			// handle single digit minor version
 			id.MinorVersion = id.MajorVersion % 10
 			id.MajorVersion = 9
+		} else if id.MajorVersion/100 == 9 {
+			// handle two digit minor version
+			id.MinorVersion = id.MajorVersion % 100
+			id.MajorVersion = 9
 		}
-		// two digit minor versions in the old format are not supported
 	}
 
 	if id.MajorVersion != 9 {
