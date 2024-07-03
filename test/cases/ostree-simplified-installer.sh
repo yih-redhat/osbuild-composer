@@ -5,6 +5,12 @@ set -euo pipefail
 source /etc/os-release
 ARCH=$(uname -m)
 
+# In case port 8081 is already in use
+sudo dnf install -y lsof
+if lsof -nP -iTCP -sTCP:LISTEN|grep 8081; then
+    sudo fuser -k 8081/tcp
+fi
+
 # Provision the software under test.
 /usr/libexec/osbuild-composer-test/provision.sh none
 
