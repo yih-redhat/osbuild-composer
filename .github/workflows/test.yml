@@ -2,9 +2,9 @@
 name: RHEL for Edge test on RHEL 9
 
 on:
-  # Triggered by osbuild-composer CI from gitlab
-  repository_dispatch:
-    types: [osbuild-composer-ci]
+  issue_comment:
+    types:
+      - created
 
 jobs:
   pr-info:
