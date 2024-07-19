@@ -160,6 +160,8 @@ func deviceName(p disk.Entity) string {
 		return payload.Name
 	case *disk.LVMLogicalVolume:
 		return payload.Name
+	case *disk.Btrfs:
+		return "btrfs-" + payload.UUID[:4]
 	}
 	panic(fmt.Sprintf("unsupported device type in deviceName: '%T'", p))
 }
@@ -254,13 +256,17 @@ func genOsbuildMount(source string, mnt disk.Mountable) (*Mount, error) {
 	case "ext4":
 		return NewExt4Mount(name, source, mountpoint), nil
 	case "btrfs":
-		return NewBtrfsMount(name, source, mountpoint), nil
+		if subvol, isSubvol := mnt.(*disk.BtrfsSubvolume); isSubvol {
+			return NewBtrfsMount(name, source, mountpoint, subvol.Name, subvol.Compress), nil
+		} else {
+			return nil, fmt.Errorf("mounting bare btrfs partition is unsupported: %s", mountpoint)
+		}
 	default:
 		return nil, fmt.Errorf("unknown fs type " + t)
 	}
 }
 
-// genMountsDevicesFromPt generates osbuild mounts and devices from a disk.PartitionTable
+// GenMountsDevicesFromPT generates osbuild mounts and devices from a disk.PartitionTable
 // filename is the name of the underlying image file (which will get loop-mounted).
 //
 // Returned values:
@@ -268,7 +274,7 @@ func genOsbuildMount(source string, mnt disk.Mountable) (*Mount, error) {
 // 2) generated mounts
 // 3) generated devices
 // 4) error if any
-func genMountsDevicesFromPt(filename string, pt *disk.PartitionTable) (string, []Mount, map[string]Device, error) {
+func GenMountsDevicesFromPT(filename string, pt *disk.PartitionTable) (string, []Mount, map[string]Device, error) {
 	devices := make(map[string]Device, len(pt.Partitions))
 	mounts := make([]Mount, 0, len(pt.Partitions))
 	var fsRootMntName string
