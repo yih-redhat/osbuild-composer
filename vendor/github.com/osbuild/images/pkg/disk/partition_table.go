@@ -160,10 +160,6 @@ func NewPartitionTable(basePT *PartitionTable, mountpoints []blueprint.Filesyste
 	return newPT, nil
 }
 
-func (pt *PartitionTable) IsContainer() bool {
-	return true
-}
-
 func (pt *PartitionTable) Clone() Entity {
 	if pt == nil {
 		return nil
@@ -773,6 +769,10 @@ func (pt *PartitionTable) ensureBtrfs() error {
 			return fmt.Errorf("root entity is not mountable: %T, this is a violation of entityPath() contract", rootPath[0])
 		}
 
+		opts, err := rootMountable.GetFSTabOptions()
+		if err != nil {
+			return err
+		}
 		btrfs := &Btrfs{
 			Label: "root",
 			Subvolumes: []BtrfsSubvolume{
@@ -780,7 +780,8 @@ func (pt *PartitionTable) ensureBtrfs() error {
 					Name:       "root",
 					Mountpoint: "/",
 					Compress:   DefaultBtrfsCompression,
-					ReadOnly:   rootMountable.GetFSTabOptions().ReadOnly(),
+					ReadOnly:   opts.ReadOnly(),
+					Size:       part.Size,
 				},
 			},
 		}

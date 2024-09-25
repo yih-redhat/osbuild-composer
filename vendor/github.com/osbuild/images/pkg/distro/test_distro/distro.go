@@ -9,6 +9,7 @@ import (
 	"github.com/osbuild/images/pkg/distro"
 	"github.com/osbuild/images/pkg/manifest"
 	"github.com/osbuild/images/pkg/ostree"
+	"github.com/osbuild/images/pkg/policies"
 	"github.com/osbuild/images/pkg/rpmmd"
 )
 
@@ -225,12 +226,6 @@ func (t *TestImageType) PayloadPackageSets() []string {
 	return []string{blueprintPkgsKey}
 }
 
-func (t *TestImageType) PackageSetsChains() map[string][]string {
-	return map[string][]string{
-		osPkgsKey: {osPkgsKey, blueprintPkgsKey},
-	}
-}
-
 func (t *TestImageType) Exports() []string {
 	return distro.ExportsFallback()
 }
@@ -240,15 +235,9 @@ func (t *TestImageType) Manifest(b *blueprint.Blueprint, options distro.ImageOpt
 	if b != nil {
 		mountpoints := b.Customizations.GetFilesystems()
 
-		invalidMountpoints := []string{}
-		for _, m := range mountpoints {
-			if m.Mountpoint != "/" {
-				invalidMountpoints = append(invalidMountpoints, m.Mountpoint)
-			}
-		}
-
-		if len(invalidMountpoints) > 0 {
-			return nil, nil, fmt.Errorf("The following custom mountpoints are not supported %+q", invalidMountpoints)
+		err := blueprint.CheckMountpointsPolicy(mountpoints, policies.MountpointPolicies)
+		if err != nil {
+			return nil, nil, err
 		}
 
 		bpPkgs = b.GetPackages()
