@@ -2,7 +2,6 @@ package rhel9
 
 import (
 	"github.com/osbuild/images/internal/common"
-	"github.com/osbuild/images/pkg/customizations/subscription"
 	"github.com/osbuild/images/pkg/distro"
 	"github.com/osbuild/images/pkg/distro/rhel"
 	"github.com/osbuild/images/pkg/osbuild"
@@ -25,33 +24,10 @@ func mkGCEImageType() *rhel.ImageType {
 		[]string{"archive"},
 	)
 
+	it.NameAliases = []string{"gce-rhui"}
 	// The configuration for non-RHUI images does not touch the RHSM configuration at all.
 	// https://issues.redhat.com/browse/COMPOSER-2157
 	it.DefaultImageConfig = baseGCEImageConfig()
-	it.KernelOptions = gceKernelOptions
-	it.DefaultSize = 20 * common.GibiByte
-	it.Bootable = true
-	// TODO: the base partition table still contains the BIOS boot partition, but the image is UEFI-only
-	it.BasePartitionTables = defaultBasePartitionTables
-
-	return it
-}
-
-func mkGCERHUIImageType() *rhel.ImageType {
-	it := rhel.NewImageType(
-		"gce-rhui",
-		"image.tar.gz",
-		"application/gzip",
-		map[string]rhel.PackageSetFunc{
-			rhel.OSPkgsKey: gceRhuiPackageSet,
-		},
-		rhel.DiskImage,
-		[]string{"build"},
-		[]string{"os", "image", "archive"},
-		[]string{"archive"},
-	)
-
-	it.DefaultImageConfig = defaultGceRhuiImageConfig()
 	it.KernelOptions = gceKernelOptions
 	it.DefaultSize = 20 * common.GibiByte
 	it.Bootable = true
@@ -106,14 +82,12 @@ func baseGCEImageConfig() *distro.ImageConfig {
 				Filename: "google-cloud.repo",
 				Repos: []osbuild.YumRepository{
 					{
-						Id:       "google-compute-engine",
-						Name:     "Google Compute Engine",
-						BaseURLs: []string{"https://packages.cloud.google.com/yum/repos/google-compute-engine-el9-x86_64-stable"},
-						Enabled:  common.ToPtr(true),
-						// TODO: enable GPG check once Google stops using SHA-1 in their keys
-						// https://issuetracker.google.com/issues/223626963
-						GPGCheck:     common.ToPtr(false),
-						RepoGPGCheck: common.ToPtr(false),
+						Id:           "google-compute-engine",
+						Name:         "Google Compute Engine",
+						BaseURLs:     []string{"https://packages.cloud.google.com/yum/repos/google-compute-engine-el9-x86_64-stable"},
+						Enabled:      common.ToPtr(true),
+						GPGCheck:     common.ToPtr(true),
+						RepoGPGCheck: common.ToPtr(true),
 						GPGKey: []string{
 							"https://packages.cloud.google.com/yum/doc/yum-key.gpg",
 							"https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg",
@@ -156,33 +130,6 @@ func baseGCEImageConfig() *distro.ImageConfig {
 	}
 
 	return ic
-}
-
-func defaultGceRhuiImageConfig() *distro.ImageConfig {
-	ic := &distro.ImageConfig{
-		RHSMConfig: map[subscription.RHSMStatus]*subscription.RHSMConfig{
-			subscription.RHSMConfigNoSubscription: {
-				SubMan: subscription.SubManConfig{
-					Rhsmcertd: subscription.SubManRHSMCertdConfig{
-						AutoRegistration: common.ToPtr(true),
-					},
-					Rhsm: subscription.SubManRHSMConfig{
-						ManageRepos: common.ToPtr(false),
-					},
-				},
-			},
-			subscription.RHSMConfigWithSubscription: {
-				SubMan: subscription.SubManConfig{
-					Rhsmcertd: subscription.SubManRHSMCertdConfig{
-						AutoRegistration: common.ToPtr(true),
-					},
-					// do not disable the redhat.repo management if the user
-					// explicitly request the system to be subscribed
-				},
-			},
-		},
-	}
-	return ic.InheritFrom(baseGCEImageConfig())
 }
 
 func gceCommonPackageSet(t *rhel.ImageType) rpmmd.PackageSet {
@@ -266,16 +213,7 @@ func gceCommonPackageSet(t *rhel.ImageType) rpmmd.PackageSet {
 	return ps
 }
 
-// GCE BYOS image
+// GCE image
 func gcePackageSet(t *rhel.ImageType) rpmmd.PackageSet {
 	return gceCommonPackageSet(t)
-}
-
-// GCE RHUI image
-func gceRhuiPackageSet(t *rhel.ImageType) rpmmd.PackageSet {
-	return rpmmd.PackageSet{
-		Include: []string{
-			"google-rhui-client-rhel9",
-		},
-	}.Append(gceCommonPackageSet(t))
 }

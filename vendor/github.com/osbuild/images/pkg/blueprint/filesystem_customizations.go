@@ -2,6 +2,7 @@ package blueprint
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/osbuild/images/internal/common"
@@ -23,17 +24,17 @@ func (fsc *FilesystemCustomization) UnmarshalTOML(data interface{}) error {
 		return fmt.Errorf("TOML unmarshal: mountpoint must be string, got %v of type %T", d["mountpoint"], d["mountpoint"])
 	}
 
-	switch d["size"].(type) {
+	switch d["minsize"].(type) {
 	case int64:
-		fsc.MinSize = uint64(d["size"].(int64))
+		fsc.MinSize = uint64(d["minsize"].(int64))
 	case string:
-		size, err := common.DataSizeToUint64(d["size"].(string))
+		minSize, err := common.DataSizeToUint64(d["minsize"].(string))
 		if err != nil {
-			return fmt.Errorf("TOML unmarshal: size is not valid filesystem size (%w)", err)
+			return fmt.Errorf("TOML unmarshal: minsize is not valid filesystem size (%w)", err)
 		}
-		fsc.MinSize = size
+		fsc.MinSize = minSize
 	default:
-		return fmt.Errorf("TOML unmarshal: size must be integer or string, got %v of type %T", d["size"], d["size"])
+		return fmt.Errorf("TOML unmarshal: minsize must be integer or string, got %v of type %T", d["minsize"], d["minsize"])
 	}
 
 	return nil
@@ -56,14 +57,13 @@ func (fsc *FilesystemCustomization) UnmarshalJSON(data []byte) error {
 	// The JSON specification only mentions float64 and Go defaults to it: https://go.dev/blog/json
 	switch d["minsize"].(type) {
 	case float64:
-		// Note that it uses different key than the TOML version
 		fsc.MinSize = uint64(d["minsize"].(float64))
 	case string:
-		size, err := common.DataSizeToUint64(d["minsize"].(string))
+		minSize, err := common.DataSizeToUint64(d["minsize"].(string))
 		if err != nil {
-			return fmt.Errorf("JSON unmarshal: size is not valid filesystem size (%w)", err)
+			return fmt.Errorf("JSON unmarshal: minsize is not valid filesystem size (%w)", err)
 		}
-		fsc.MinSize = size
+		fsc.MinSize = minSize
 	default:
 		return fmt.Errorf("JSON unmarshal: minsize must be float64 number or string, got %v of type %T", d["minsize"], d["minsize"])
 	}
@@ -73,16 +73,15 @@ func (fsc *FilesystemCustomization) UnmarshalJSON(data []byte) error {
 
 // CheckMountpointsPolicy checks if the mountpoints are allowed by the policy
 func CheckMountpointsPolicy(mountpoints []FilesystemCustomization, mountpointAllowList *pathpolicy.PathPolicies) error {
-	invalidMountpoints := []string{}
+	var errs []error
 	for _, m := range mountpoints {
-		err := mountpointAllowList.Check(m.Mountpoint)
-		if err != nil {
-			invalidMountpoints = append(invalidMountpoints, m.Mountpoint)
+		if err := mountpointAllowList.Check(m.Mountpoint); err != nil {
+			errs = append(errs, err)
 		}
 	}
 
-	if len(invalidMountpoints) > 0 {
-		return fmt.Errorf("The following custom mountpoints are not supported %+q", invalidMountpoints)
+	if len(errs) > 0 {
+		return fmt.Errorf("The following errors occurred while setting up custom mountpoints:\n%w", errors.Join(errs...))
 	}
 
 	return nil
