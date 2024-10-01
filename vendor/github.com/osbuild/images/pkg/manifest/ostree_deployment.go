@@ -330,7 +330,10 @@ func (p *OSTreeDeployment) serialize() osbuild.Pipeline {
 	configStage.MountOSTree(p.osName, ref, 0)
 	pipeline.AddStage(configStage)
 
-	fstabOptions := osbuild.NewFSTabStageOptions(p.PartitionTable)
+	fstabOptions, err := osbuild.NewFSTabStageOptions(p.PartitionTable)
+	if err != nil {
+		panic(err)
+	}
 	fstabStage := osbuild.NewFSTabStage(fstabOptions)
 	fstabStage.MountOSTree(p.osName, ref, 0)
 	pipeline.AddStage(fstabStage)
@@ -518,7 +521,7 @@ func createMountpointService(serviceName string, mountpoints []string) *osbuild.
 		After:                    []string{"ostree-remount.service"},
 	}
 	service := osbuild.Service{
-		Type:            osbuild.Oneshot,
+		Type:            osbuild.OneshotServiceType,
 		RemainAfterExit: false,
 		// compatibility with composefs, will require transient rootfs to be enabled too.
 		ExecStartPre: []string{"/bin/sh -c \"if grep -Uq composefs /run/ostree-booted; then echo 'Warning: composefs enabled! ensure transient rootfs is enabled too.'; else chattr -i /; fi\""},
@@ -544,7 +547,7 @@ func createMountpointService(serviceName string, mountpoints []string) *osbuild.
 	}
 	options := osbuild.SystemdUnitCreateStageOptions{
 		Filename: serviceName,
-		UnitPath: osbuild.Etc,
+		UnitPath: osbuild.EtcUnitPath,
 		UnitType: osbuild.System,
 		Config: osbuild.SystemdServiceUnit{
 			Unit:    &unit,

@@ -56,14 +56,13 @@ const (
 
 	// Extended Boot Loader Partition
 	XBootLDRPartitionGUID = "BC13C2FF-59E6-4262-A352-B275FD6F7172"
+
+	// DosFat16B used for the ESP-System partition
+	DosFat16B = "06"
 )
 
 // Entity is the base interface for all disk-related entities.
 type Entity interface {
-	// IsContainer indicates if the implementing type can
-	// contain any other entities.
-	IsContainer() bool
-
 	// Clone returns a deep copy of the entity.
 	Clone() Entity
 }
@@ -114,7 +113,7 @@ type Mountable interface {
 	GetFSSpec() FSSpec
 
 	// GetFSTabOptions returns options for mounting the entity.
-	GetFSTabOptions() FSTabOptions
+	GetFSTabOptions() (FSTabOptions, error)
 }
 
 // A MountpointCreator is a container that is able to create new volumes.

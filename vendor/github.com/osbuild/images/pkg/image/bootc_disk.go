@@ -3,7 +3,9 @@ package image
 import (
 	"fmt"
 	"math/rand"
+	"regexp"
 
+	"github.com/osbuild/images/internal/common"
 	"github.com/osbuild/images/pkg/container"
 	"github.com/osbuild/images/pkg/customizations/users"
 	"github.com/osbuild/images/pkg/disk"
@@ -75,6 +77,9 @@ func (img *BootcDiskImage) InstantiateManifestFromContainers(m *manifest.Manifes
 	vmdkPipeline := manifest.NewVMDK(hostPipeline, rawImage)
 	vmdkPipeline.SetFilename(fmt.Sprintf("%s.vmdk", fileBasename))
 
+	vhdPipeline := manifest.NewVPC(hostPipeline, rawImage)
+	vhdPipeline.SetFilename(fmt.Sprintf("%s.vhd", fileBasename))
+
 	ovfPipeline := manifest.NewOVF(hostPipeline, vmdkPipeline)
 	tarPipeline := manifest.NewTar(hostPipeline, ovfPipeline, "archive")
 	tarPipeline.Format = osbuild.TarArchiveFormatUstar
@@ -84,6 +89,19 @@ func (img *BootcDiskImage) InstantiateManifestFromContainers(m *manifest.Manifes
 		fmt.Sprintf("%s.ovf", fileBasename),
 		fmt.Sprintf("%s.mf", fileBasename),
 		fmt.Sprintf("%s.vmdk", fileBasename),
+		fmt.Sprintf("%s.vhd", fileBasename),
 	}
+
+	// XXX: copied from https://github.com/osbuild/images/blob/v0.85.0/pkg/image/disk.go#L102
+	gcePipeline := manifest.NewTar(buildPipeline, rawImage, "gce")
+	gcePipeline.Format = osbuild.TarArchiveFormatOldgnu
+	gcePipeline.RootNode = osbuild.TarRootNodeOmit
+	// these are required to successfully import the image to GCP
+	gcePipeline.ACLs = common.ToPtr(false)
+	gcePipeline.SELinux = common.ToPtr(false)
+	gcePipeline.Xattrs = common.ToPtr(false)
+	gcePipeline.Transform = fmt.Sprintf(`s/%s/disk.raw/`, regexp.QuoteMeta(rawImage.Filename()))
+	gcePipeline.SetFilename("image.tgz")
+
 	return nil
 }
